@@ -106,13 +106,6 @@ where customerid in ( SELECT customerid FROM churn WHERE customerstatus = 'Churn
 	and onlinesecurity = 'true' and onlinebackup ='true'
 	group by onlinesecurity,onlinebackup
 ---------------------------------------------------------------------------------
---Identify the customers who have churned and used the most online services
-
-
-
-
-
-
 
 ---------------------------------------------------------------------------------
 --Create a view to find the customers with the highest monthly charges in each contract type
@@ -153,25 +146,35 @@ Select * from Churned_cumulative_total_charges_over_time
 drop view Churned_cumulative_total_charges_over_time
 
 ---------------------------------------------------------------------------------
---Stored Procedure to Calculate Churn Rate
+--Stored Procedure to call churned members 
 
-CREATE OR REPLACE PROCEDURE calculate_churn_rate()
+CREATE OR REPLACE PROCEDURE move_churned_employees()
 LANGUAGE plpgsql
 AS $$
+DECLARE
+  v_employee_record RECORD;
 BEGIN
-    DECLARE
-        total_customers INT;
-        churned_customers INT;
-        churn_rate NUMERIC(10, 2);
+  -- Create the new table if it doesn't exist
+  CREATE TABLE IF NOT EXISTS employees_left (
+    customerstatus varchar,
+    customerid varchar,
+    churncategory varchar,
+    churnreason varchar
+  );
 
-    SELECT 
-        COUNT(customerid) INTO total_customers,
-        COUNT(*) FILTER (WHERE customer_status = 'Churned') INTO churned_customers,
-        (COUNT(*) FILTER (WHERE customer_status = 'Churned')::numeric / COUNT(*)) * 100::numeric(10, 2) INTO churn_rate
-    FROM churn;
-
-    RAISE NOTICE 'Churn Rate: %.2f%', churn_rate;
+  -- Insert 'left' employees into the new table
+  FOR v_employee_record IN
+    SELECT * FROM churn WHERE customerstatus = 'Churned'
+  LOOP
+    INSERT INTO employees_left (customerstatus, customerid, churncategory, churnreason)
+    VALUES (v_employee_record.customerstatus, v_employee_record.customerid, v_employee_record.churncategory, v_employee_record.churnreason);
+  END LOOP;
 END;
 $$;
 
+select * from churn
+
+call move_churned_employees()
+
+select * from employees_left
 
